@@ -1,0 +1,26 @@
+# Application & API Flow Document
+
+## 1. End-to-End Request Flow
+1. **User/Client Input:** User submits topic, `output_language` (default `auto`), provider choice (or default), model, notification flags and optional integration keys via the Web Console (`/`) or `POST /api/v1/digest`. The browser stores provider keys **per provider** in `localStorage` and shows whether the active key is a UI override or the server `.env` key.
+2. **Validation Layer:** Pydantic `DigestRequest` validates input fields, provider enum and email syntax; `output_language` is trimmed (blank → `auto`) and capped at 40 chars. Every secret is sanitized: quotes/whitespace stripped, placeholder values (`your_...`, `changeme`, `sk-xxx`, `tvly-xxx`, `re_xxx`, `...example...`) collapsed to `None`.
+3. **LLM Resolution (`llm_factory.py`):** `describe_api_key()` resolves the selected provider (`openrouter`, `openai`, `custom`, etc.) with strict precedence `api_key_override` → sanitized `.env`, reporting the winner as `KeyResolution` (source + masked fingerprint). `config.get_settings()` re-reads `.env` whenever its mtime/size changes, so new keys apply without restarting uvicorn. The resolved key and `base_url` are injected (OpenRouter also gets `HTTP-Referer`/`X-Title`) and the model client is initialized.
+4. **Model Selection (Live Model Discovery):** Via `POST /api/v1/models/discover`, the backend calls `fetch_available_models(provider, api_key_override, custom_base_url)` and returns the live, non-deprecated model list for the chosen provider; the user picks a model from this up-to-date list (default fallback `openrouter/auto`). For OpenRouter the key is verified against `/api/v1/auth/key` first (the public `/models` list accepts invalid tokens); rejections name the masked fingerprint and source.
+5. **Integration Resolution (`agent_engine.resolve_integrations`):** Tavily, Resend (key + from-email) and Discord webhook come from the cleaned UI override (`integrations_config` or flat fields) first, then `.env`, then graceful degradation.
+6. **Search Step:** Async call to Tavily API retrieves real-time web context for the topic (mock fallback when no key is configured).
+7. **Agent Synthesis Step:** LangChain pipeline filters noisy results and synthesizes a structured digest + extracts token usage metadata. `build_system_prompt(output_language)` either mirrors the topic language (`auto`, with translated section headings such as `## نکات کلیدی`) or forces the requested target language. `response.content` is normalized, so list-of-block (vision/reasoning) payloads and empty output become valid Markdown instead of crashing.
+8. **Error Mapping:** Upstream exceptions become `LLMUpstreamError` carrying an actionable detail and status — `401` bad key, `400` rejected model / data-policy, `429` rate limit, `502` timeout or network — returned as `{"detail": ...}` instead of a `500` crash. `401/403` details name the key in use: `UI Override (sk-or-v…4a2b)` or `Server .env (...)` (fingerprint only, never the secret).
+9. **Notification Step:** Parallel async dispatch (`asyncio.gather`) to Resend API and Discord Webhook using the resolved credentials.
+10. **Persistence Step:** `database.py` writes execution log, token count, cost and latency into `aiosqlite`.
+11. **Response Output:** Returns structured `DigestResponse` JSON and updates the UI dashboard (Markdown reader, telemetry, delivery pills).
+
+## 1b. Web Console Flow (`static/index.html`)
+1. Page load fetches `/api/v1/providers` for defaults, non-secret `env_status` booleans and masked `env_fingerprints`, restores provider/model/theme/`output_language` from `localStorage`, applies the saved day/night theme before acting, and loads the per-provider key for the active provider.
+2. **Discover Live Models** posts the selected provider plus its provider-scoped key and optional base URL; the returned catalog feeds the model dropdown. The key box shows `Active key: UI Override (…)` or `Active key: Server .env (…)` with a **× Use server .env instead** action.
+3. The live search input and quick-filter chips (`All / ⚡ Free / GPT / Claude / Gemini / DeepSeek / Llama`) filter the catalog client-side, update the `Showing X of Y models` counter and auto-select the first match.
+4. Running a digest sends the chosen `output_language` (`auto` by default), shows the animated three-step pipeline (`Searching Web via Tavily → Synthesizing with AI → Dispatching Alerts`), then renders sanitized Markdown (`marked` + `DOMPurify`), latency, token breakdown, cost and delivery pills in both light and dark themes.
+5. Any backend `detail` is surfaced in a styled alert with status-specific troubleshooting tips.
+
+## 2. Self-Update Watchdog Flow (`GET /api/v1/system/check-updates`)
+1. Queries PyPI JSON API (`https://pypi.org/pypi/{package}/json`) for `fastapi`, `langchain-core`, `langchain-openai`, `pydantic`, `aiosqlite`.
+2. Compares installed version (`importlib.metadata`) with latest stable version (ignoring pre-releases like `rc`, `alpha`, `beta`).
+3. If a newer stable version is detected -> Fetches release summary -> Sends notification to Discord/Resend -> Outputs actionable update report.

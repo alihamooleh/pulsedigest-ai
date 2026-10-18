@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseDigest AI — Autonomous Research Console</title>
+  <meta name="description" content="Autonomous web research, executive AI digests, and multi-channel delivery." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <script>
+    // Apply the saved day/night theme before first paint (no wrong-mode flash).
+    (() => {
+      try {
+        if (localStorage.getItem('pd.theme') === 'light') {
+          document.documentElement.classList.add('light');
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (error) { /* storage blocked — keep the dark default */ }
+    })();
+  </script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Vazirmatn', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+            fa: ['Vazirmatn', 'Inter', 'sans-serif']
+          },
+          colors: {
+            ink: { 950: '#08080B', 900: '#0C0C10', 850: '#101015' },
+            pulse: { 400: '#34D399', 500: '#10B981', 600: '#059669' },
+            iris: { 400: '#818CF8', 500: '#6366F1' }
+          },
+          boxShadow: {
+            glow: '0 0 0 1px rgba(16,185,129,0.12), 0 20px 60px -20px rgba(16,185,129,0.25)',
+            card: '0 24px 70px -32px rgba(0,0,0,0.9)'
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { min-height: 100%; }
+    body {
+      background-color: #08080B;
+      color: #FAFAFA;
+      font-feature-settings: 'cv02','cv03','cv04','ss01';
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Ambient radial aurora */
+    .aurora {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .aurora::before, .aurora::after {
+      content: ''; position: absolute; width: 60rem; height: 60rem; border-radius: 50%;
+      filter: blur(120px); opacity: .30;
+    }
+    .aurora::before {
+      top: -28rem; left: -14rem;
+      background: radial-gradient(circle at center, rgba(16,185,129,.55), transparent 62%);
+      animation: drift 22s ease-in-out infinite alternate;
+    }
+    .aurora::after {
+      bottom: -32rem; right: -18rem;
+      background: radial-gradient(circle at center, rgba(99,102,241,.45), transparent 62%);
+      animation: drift 28s ease-in-out infinite alternate-reverse;
+    }
+    .grid-overlay {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .35;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    }
+    @keyframes drift {
+      0% { transform: translate3d(0,0,0) scale(1); }
+      100% { transform: translate3d(6rem,4rem,0) scale(1.12); }
+    }
+    .glass {
+      background: linear-gradient(180deg, rgba(24,24,27,.82), rgba(12,12,16,.86));
+      border: 1px solid rgba(63,63,70,.72);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      box-shadow: 0 24px 70px -40px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    .glass-soft {
+      background: rgba(24,24,27,.55);
+      border: 1px solid rgba(63,63,70,.55);
+      backdrop-filter: blur(14px);
+    }
+    .field {
+      width: 100%; border-radius: .75rem; border: 1px solid rgba(63,63,70,.8);
+      background: rgba(9,9,11,.72); padding: .6rem .8rem; font-size: .8125rem;
+      color: #FAFAFA; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .field::placeholder { color: #52525B; }
+    .field:focus {
+      outline: none; border-color: rgba(16,185,129,.7); background: rgba(9,9,11,.95);
+      box-shadow: 0 0 0 3px rgba(16,185,129,.12);
+    }
+    .field[type="password"] { font-family: 'JetBrains Mono', monospace; letter-spacing: .02em; }
+    select.field {
+      appearance: none; padding-right: 2rem; cursor: pointer;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2371717A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right .7rem center;
+      background-size: 14px 14px;
+    }
+    /* Keep exactly one chevron: any later rule that paints the field background must
+       use background-color so these longhands (image/repeat/position/size) survive. */
+    select.field, html.light select.field {
+      background-repeat: no-repeat; background-position: right .7rem center;
+      background-size: 14px 14px;
+    }
+    select.field option { background: #18181B; color: #FAFAFA; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      border-radius: .75rem; font-weight: 600; font-size: .8125rem; padding: .62rem 1rem;
+      transition: transform .15s ease, background .18s ease, border-color .18s ease, opacity .18s ease;
+      white-space: nowrap;
+    }
+    .btn:active { transform: translateY(1px) scale(.995); }
+    .btn-primary {
+      background: linear-gradient(180deg, #10B981, #059669); color: #04120C;
+      box-shadow: 0 10px 30px -12px rgba(16,185,129,.65), inset 0 1px 0 rgba(255,255,255,.22);
+    }
+    .btn-primary:hover { background: linear-gradient(180deg, #34D399, #10B981); }
+    .btn-primary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+    .btn-indigo {
+      background: linear-gradient(180deg, #6366F1, #4F46E5); color: #fff;
+      box-shadow: 0 10px 30px -14px rgba(99,102,241,.8), inset 0 1px 0 rgba(255,255,255,.18);
+    }
+    .btn-indigo:hover { background: linear-gradient(180deg, #818CF8, #6366F1); }
+    .btn-ghost {
+      background: rgba(39,39,42,.55); color: #D4D4D8; border: 1px solid rgba(63,63,70,.9);
+    }
+    .btn-ghost:hover { background: rgba(63,63,70,.55); color: #FAFAFA; }
+    .chip {
+      border-radius: 9999px; border: 1px solid rgba(63,63,70,.85);
+      background: rgba(24,24,27,.65); color: #A1A1AA;
+      padding: .3rem .68rem; font-size: .6875rem; font-weight: 600; letter-spacing: .01em;
+      transition: all .16s ease; cursor: pointer;
+    }
+    .chip:hover { color: #FAFAFA; border-color: rgba(16,185,129,.5); }
+    .chip.active {
+      background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.65); color: #6EE7B7;
+      box-shadow: 0 0 0 1px rgba(16,185,129,.18), 0 0 20px -8px rgba(16,185,129,.6);
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: .3rem; border-radius: 9999px;
+      padding: .14rem .5rem; font-size: .625rem; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-env { background: rgba(16,185,129,.12); color: #6EE7B7; border: 1px solid rgba(16,185,129,.32); }
+    .badge-empty { background: rgba(113,113,122,.14); color: #A1A1AA; border: 1px solid rgba(113,113,122,.32); }
+    .badge-iris { background: rgba(99,102,241,.14); color: #A5B4FC; border: 1px solid rgba(99,102,241,.35); }
+    .badge-amber { background: rgba(245,158,11,.13); color: #FCD34D; border: 1px solid rgba(245,158,11,.35); }
+    .badge-model { text-transform: none; letter-spacing: .01em; font-size: .6rem; }
+    .badge-counter { text-transform: none; letter-spacing: .01em; font-size: .6rem; white-space: nowrap; }
+    .badge-red { background: rgba(239,68,68,.13); color: #FCA5A5; border: 1px solid rgba(239,68,68,.35); }
+    .pulse-dot {
+      position: relative; display: inline-flex; height: .5rem; width: .5rem; border-radius: 9999px;
+      background: #10B981; box-shadow: 0 0 12px 2px rgba(16,185,129,.65);
+    }
+    .pulse-dot::after {
+      content: ''; position: absolute; inset: 0; border-radius: 9999px; background: #10B981;
+      animation: ping 1.8s cubic-bezier(0,0,.2,1) infinite;
+    }
+    @keyframes ping { 75%, 100% { transform: scale(2.4); opacity: 0; } }
+    .toggle {
+      position: relative; width: 2.5rem; height: 1.375rem; border-radius: 9999px;
+      background: rgba(63,63,70,.85); transition: background .2s ease; cursor: pointer; flex: none;
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px; height: 1.125rem; width: 1.125rem;
+      border-radius: 9999px; background: #E4E4E7; transition: transform .2s ease, background .2s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+    input[type="checkbox"]:checked + .toggle { background: linear-gradient(180deg,#10B981,#059669); }
+    input[type="checkbox"]:checked + .toggle::after { transform: translateX(1.125rem); background: #04120C; }
+    input[type="checkbox"]:focus-visible + .toggle { box-shadow: 0 0 0 3px rgba(16,185,129,.25); }
+    .step-dot {
+      height: .5rem; width: .5rem; border-radius: 9999px; background: #3F3F46; flex: none;
+      transition: all .3s ease;
+    }
+    .step[data-state="active"] .step-dot { background: #34D399; box-shadow: 0 0 0 4px rgba(16,185,129,.16); animation: breathe 1.4s ease-in-out infinite; }
+    .step[data-state="done"] .step-dot { background: #10B981; box-shadow: 0 0 10px rgba(16,185,129,.7); }
+    .step[data-state="active"] .step-label { color: #FAFAFA; }
+    .step[data-state="pending"] .step-label { color: #52525B; }
+    .step[data-state="done"] .step-label { color: #A1A1AA; }
+    @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+    .fade-in { animation: fadeIn .4s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    /* Markdown reader */
+    .prose-pd { color: #D4D4D8; font-size: .875rem; line-height: 1.75; word-wrap: break-word; }
+    .prose-pd > * + * { margin-top: .85rem; }
+    .prose-pd h1, .prose-pd h2, .prose-pd h3, .prose-pd h4 {
+      color: #FAFAFA; font-weight: 700; letter-spacing: -.01em; line-height: 1.3;
+      margin-top: 1.6rem; scroll-margin-top: 2rem;
+    }
+    .prose-pd h1 { font-size: 1.35rem; }
+    .prose-pd h2 {
+      font-size: 1.02rem; text-transform: uppercase; letter-spacing: .08em; color: #6EE7B7;
+      padding-bottom: .5rem; border-bottom: 1px solid rgba(63,63,70,.65);
+    }
+    .prose-pd h3 { font-size: .95rem; color: #E4E4E7; }
+    .prose-pd strong { color: #FAFAFA; font-weight: 650; }
+    .prose-pd em { color: #D4D4D8; }
+    .prose-pd a { color: #6EE7B7; text-decoration: underline; text-underline-offset: 2px; }
+    .prose-pd a:hover { color: #A7F3D0; }
+    .prose-pd ul, .prose-pd ol { padding-left: 1.15rem; }
+    .prose-pd ul { list-style: disc; }
+    .prose-pd ol { list-style: decimal; }
+    .prose-pd li { margin-top: .35rem; }
+    .prose-pd li::marker { color: #10B981; }
+    .prose-pd ol li::marker { color: #71717A; font-family: 'JetBrains Mono', monospace; font-size: .8em; }
+    .prose-pd code {
+      font-family: 'JetBrains Mono', monospace; font-size: .78rem; color: #A5B4FC;
+      background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.2);
+      border-radius: .35rem; padding: .1rem .35rem;
+    }
+    .prose-pd pre {
+      background: rgba(9,9,11,.9); border: 1px solid rgba(63,63,70,.8); border-radius: .75rem;
+      padding: .9rem 1rem; overflow-x: auto;
+    }
+    .prose-pd pre code { background: transparent; border: 0; padding: 0; color: #D4D4D8; font-size: .78rem; }
+    .prose-pd blockquote {
+      border-left: 2px solid rgba(16,185,129,.55); padding-left: .9rem; color: #A1A1AA; font-style: italic;
+    }
+    .prose-pd hr { border-color: rgba(63,63,70,.6); }
+    .prose-pd table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .prose-pd th, .prose-pd td { border: 1px solid rgba(63,63,70,.7); padding: .45rem .6rem; text-align: left; }
+    .prose-pd th { background: rgba(39,39,42,.6); color: #E4E4E7; }
+    .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #3F3F46 transparent; }
+    .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #3F3F46; border-radius: 9999px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(63,63,70,.85), transparent); }
+    .meter-fill { transition: width .5s cubic-bezier(.2,.8,.2,1); }
+
+    /* ================= DAY THEME (html.light) ================= */
+    html.light { color-scheme: light; }
+    html.light body { background-color: #DCE3EC; color: #1E293B; }
+    html.light ::selection { background: rgba(16,185,129,.22); color: #064E3B; }
+    html.light .aurora::before {
+      opacity: .40; background: radial-gradient(circle at center, rgba(16,185,129,.26), transparent 62%);
+    }
+    html.light .aurora::after {
+      opacity: .40; background: radial-gradient(circle at center, rgba(99,102,241,.18), transparent 62%);
+    }
+    html.light .grid-overlay {
+      opacity: .6;
+      background-image:
+        linear-gradient(to right, rgba(15,23,42,.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(15,23,42,.05) 1px, transparent 1px);
+    }
+    html.light .glass {
+      background: linear-gradient(180deg, rgba(241,245,249,.92), rgba(241,245,249,.86));
+      border-color: rgba(203,213,225,.95);
+      box-shadow: 0 22px 48px -34px rgba(15,23,42,.30), inset 0 1px 0 rgba(255,255,255,.6);
+    }
+    html.light .glass-soft { background: rgba(241,245,249,.78); border-color: rgba(203,213,225,.9); }
+    html.light .divider { background: linear-gradient(90deg, transparent, rgba(203,213,225,.9), transparent); }
+    /* background-color only — a `background` shorthand here would reset the select chevron longhands. */
+    html.light .field { background-color: #E8EEF5; border-color: #CBD5E1; color: #1E293B; }
+    html.light .field::placeholder { color: #7C8B9E; }
+    html.light .field:focus {
+      background-color: #EDF2F8; border-color: rgba(5,150,105,.7);
+      box-shadow: 0 0 0 3px rgba(16,185,129,.14);
+    }
+    html.light select.field {
+      background-color: #E8EEF5;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right .7rem center;
+      background-size: 14px 14px;
+    }
+    html.light select.field option { background: #F1F5F9; color: #1E293B; }
+    html.light .btn-ghost {
+      background: #E8EEF5; color: #334155; border-color: #CBD5E1;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04);
+    }
+    html.light .btn-ghost:hover { background: #DDE6EF; color: #0F172A; }
+    html.light .chip { background: #E2E8F0; color: #334155; border-color: #CBD5E1; }
+    html.light .chip:hover { background: #DCE6F0; color: #0F172A; border-color: rgba(5,150,105,.55); }
+    html.light .chip.active {
+      background: rgba(16,185,129,.14); color: #047857; border-color: rgba(5,150,105,.5);
+      box-shadow: 0 0 0 1px rgba(16,185,129,.16);
+    }
+    html.light .badge-env { background: rgba(16,185,129,.12); color: #047857; border-color: rgba(5,150,105,.28); }
+    html.light .badge-empty { background: #E2E8F0; color: #475569; border-color: #CBD5E1; }
+    html.light .badge-iris { background: rgba(99,102,241,.10); color: #4338CA; border-color: rgba(99,102,241,.24); }
+    html.light .badge-amber { background: rgba(245,158,11,.12); color: #B45309; border-color: rgba(245,158,11,.30); }
+    html.light .badge-red { background: rgba(239,68,68,.10); color: #B91C1C; border-color: rgba(239,68,68,.28); }
+    html.light .step-dot { background: #CBD5E1; }
+    html.light .step[data-state="active"] .step-label { color: #0F172A; }
+    html.light .step[data-state="pending"] .step-label { color: #94A3B8; }
+    html.light .step[data-state="done"] .step-label { color: #475569; }
+    html.light .toggle { background: #C3CEDC; }
+    html.light .toggle::after { background: #F1F5F9; }
+    html.light input[type="checkbox"]:checked + .toggle::after { background: #04120C; }
+    html.light .scrollbar-thin { scrollbar-color: #B8C4D4 transparent; }
+    html.light .scrollbar-thin::-webkit-scrollbar-thumb { background: #B8C4D4; }
+    html.light #brand-mark {
+      background: linear-gradient(135deg, #D1FAE5, #E0E7FF);
+      border-color: #A7F3D0; box-shadow: none;
+    }
+    html.light #brand-mark svg { stroke: #047857; }
+    /* Inline SVGs carry dark-theme stroke attributes — darken them for the day palette. */
+    html.light svg[stroke="#A1A1AA"], html.light svg[stroke="#52525B"] { stroke: #475569; }
+    html.light svg[stroke="#FCA5A5"] { stroke: #B91C1C; }
+    html.light #error-banner { background: #FEF2F2; border-color: #FECACA; }
+    html.light #error-detail { color: #7F1D1D; }
+    html.light #error-tips { color: #B91C1C; }
+    /* Markdown reader */
+    html.light .prose-pd { color: #334155; }
+    html.light .prose-pd h1, html.light .prose-pd h2,
+    html.light .prose-pd h3, html.light .prose-pd h4 { color: #0F172A; }
+    html.light .prose-pd h2 { color: #047857; border-bottom-color: #CBD5E1; }
+    html.light .prose-pd strong { color: #0F172A; }
+    html.light .prose-pd a { color: #047857; }
+    html.light .prose-pd a:hover { color: #065F46; }
+    html.light .prose-pd code {
+      color: #4338CA; background: rgba(99,102,241,.08); border-color: rgba(99,102,241,.18);
+    }
+    html.light .prose-pd pre { background: #E8EEF5; border-color: #CBD5E1; }
+    html.light .prose-pd pre code { color: #334155; background: transparent; border-color: transparent; }
+    html.light .prose-pd blockquote { color: #475569; border-left-color: rgba(5,150,105,.55); }
+    html.light .prose-pd hr { border-color: #CBD5E1; }
+    html.light .prose-pd li::marker { color: #059669; }
+    html.light .prose-pd ol li::marker { color: #64748B; }
+    html.light .prose-pd th { background: #E2E8F0; color: #0F172A; }
+    html.light .prose-pd th, html.light .prose-pd td { border-color: #CBD5E1; }
+    /* Tailwind utility remaps (higher specificity than the CDN classes) */
+    html.light .text-white, html.light .text-zinc-50 { color: #09090B; }
+    html.light .text-zinc-100 { color: #18181B; }
+    html.light .text-zinc-200 { color: #27272A; }
+    html.light .text-zinc-300 { color: #3F3F46; }
+    html.light .text-zinc-400, html.light .text-zinc-500 { color: #52606D; }
+    html.light .text-zinc-600 { color: #64748B; }
+    html.light .text-emerald-300, html.light .text-emerald-400 { color: #047857; }
+    html.light .text-red-200 { color: #991B1B; }
+    html.light .text-red-200\/70 { color: #B91C1C; }
+    html.light .text-red-300\/70 { color: #B91C1C; }
+    html.light .bg-zinc-950\/40, html.light .bg-zinc-950\/50 { background-color: #E6ECF3; }
+    html.light .bg-zinc-800\/40, html.light .bg-zinc-800\/60,
+    html.light .bg-zinc-800\/80 { background-color: #E2E8F0; }
+    html.light .bg-zinc-900\/90 { background-color: rgba(241,245,249,.94); }
+    html.light .bg-red-500\/15 { background-color: rgba(239,68,68,.10); }
+    html.light .bg-red-500\/\[0\.07\] { background-color: #FEF2F2; }
+    html.light .bg-black\/10 { background-color: rgba(15,23,42,.05); }
+    html.light .border-black\/20 { border-color: rgba(15,23,42,.12); }
+    html.light .border-zinc-700\/70, html.light .border-zinc-700\/80,
+    html.light .border-zinc-800\/70, html.light .border-zinc-800\/80,
+    html.light .border-zinc-800\/90 { border-color: #CBD5E1; }
+    html.light .border-red-500\/35, html.light .border-red-500\/40 { border-color: #FCA5A5; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    }
+  </style>
+</head>
+<body class="relative antialiased font-sans selection:bg-emerald-500/25 selection:text-white">
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-overlay" aria-hidden="true"></div>
+
+  <div class="relative z-10 mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 lg:px-8">
+    <!-- ================= HEADER ================= -->
+    <header class="mb-8">
+      <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex items-center gap-3.5">
+          <div id="brand-mark" class="relative grid h-11 w-11 place-items-center rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 to-indigo-500/10 shadow-[0_0_30px_-10px_rgba(16,185,129,.8)]">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6EE7B7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12h4l2.5-7 4 14L16 12h5" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h1 class="text-[1.05rem] font-bold tracking-tight text-white">PulseDigest <span class="text-emerald-400">AI</span></h1>
+              <span class="badge badge-iris">v2.0</span>
+            </div>
+            <p class="mt-0.5 text-[.72rem] font-medium text-zinc-500">Autonomous research · executive digests · multi-channel delivery</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="glass-soft flex items-center gap-2.5 rounded-full px-3.5 py-1.5">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <span class="text-[.7rem] font-semibold text-zinc-300">System operational</span>
+            <span class="mono text-[.625rem] text-zinc-600" id="header-model">openrouter/auto</span>
+          </div>
+          <div class="glass-soft flex items-center gap-2 rounded-full px-3.5 py-1.5" title="Requests logged in SQLite">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+            <span class="mono text-[.7rem] text-zinc-300" id="header-requests">0</span>
+            <span class="text-[.625rem] uppercase tracking-wider text-zinc-600">runs</span>
+          </div>
+          <button id="theme-toggle" class="btn btn-ghost" type="button" aria-pressed="false" title="Switch to day mode">
+            <svg id="theme-icon-moon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+            <svg id="theme-icon-sun" class="hidden" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <span id="theme-label">Dark</span>
+          </button>
+          <button id="check-updates" class="btn btn-ghost" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+            Check updates
+          </button>
+        </div>
+      </div>
+      <div class="divider mt-6"></div>
+    </header>
+
+    <main class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+      <!-- ================= LEFT COLUMN: CONFIG ================= -->
+      <section class="flex flex-col gap-6 xl:col-span-5">
+        <!-- 1. MODEL ROUTER -->
+        <div class="glass rounded-2xl p-5">
+          <div class="mb-4 flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <div class="grid h-7 w-7 place-items-center rounded-lg border border-zinc-700/80 bg-zinc-800/60">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+              </div>
+              <div>
+                <h2 class="text-[.82rem] font-semibold text-zinc-100">Model Router</h2>
+                <p class="text-[.68rem] text-zinc-500">Universal provider · live discovery</p>
+              </div>
+            </div>
+            <span id="provider-env-badge" class="badge badge-empty">no env key</span>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div>
+              <label for="provider-select" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Provider</label>
+              <select id="provider-select" class="field">
+                <option value="openrouter">OpenRouter</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="google">Google Gemini</option>
+                <option value="nvidia_nim">NVIDIA NIM</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="groq">Groq</option>
+                <option value="custom">Custom / Self-hosted</option>
+              </select>
+            </div>
+            <div>
+              <label for="llm-api-key" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Provider API Key</label>
+              <div class="relative">
+                <input id="llm-api-key" type="password" class="field pr-9" placeholder="sk-… (saved in this browser)" autocomplete="off" spellcheck="false" />
+                <button type="button" class="eye absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 transition hover:text-zinc-200" data-toggle="llm-api-key" aria-label="Show or hide provider API key">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <div class="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <span id="key-source" class="mono text-[.6rem] leading-tight text-zinc-500" data-source="missing">No key yet — paste one or add it to .env</span>
+                <button id="use-env-key" type="button" class="hidden text-[.6rem] font-semibold text-emerald-400 underline decoration-dotted underline-offset-2 transition hover:text-emerald-300">× Use server .env instead</button>
+              </div>
+            </div>
+            <div id="custom-base-url-wrap" class="hidden sm:col-span-2">
+              <label for="custom-base-url" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Custom Base URL</label>
+              <input id="custom-base-url" type="text" class="field mono" placeholder="https://your-endpoint/v1" autocomplete="off" spellcheck="false" />
+              <p class="mt-1 text-[.65rem] text-zinc-600">OpenAI-compatible endpoint, e.g. <span class="mono text-zinc-500">https://host/v1</span></p>
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-xl border border-zinc-800/90 bg-zinc-950/50 p-3.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="mono text-[.625rem] uppercase tracking-[.12em] text-zinc-500">Live model discovery</span>
+                <span id="model-counter" class="badge badge-empty badge-counter">0 models</span>
+              </div>
+              <button id="discover-models" type="button" class="btn btn-indigo px-3 py-1.5 text-[.72rem]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4.5 13.5H11l-1 8.5L20 10h-7l1-8Z"/></svg>
+                Discover Live Models
+              </button>
+            </div>
+
+            <div class="relative mt-3">
+              <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input id="model-search" type="search" class="field pl-8.5" style="padding-left:2.15rem" placeholder="Search 400+ models by name or ID…" autocomplete="off" spellcheck="false" />
+            </div>
+
+            <div id="filter-chips" class="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label="Model quick filters">
+              <button type="button" class="chip active" data-filter="all">All</button>
+              <button type="button" class="chip" data-filter="free">⚡ Free</button>
+              <button type="button" class="chip" data-filter="gpt">GPT</button>
+              <button type="button" class="chip" data-filter="claude">Claude</button>
+              <button type="button" class="chip" data-filter="gemini">Gemini</button>
+              <button type="button" class="chip" data-filter="deepseek">DeepSeek</button>
+              <button type="button" class="chip" data-filter="llama">Llama</button>
+            </div>
+
+            <select id="model-select" class="field mt-2.5" aria-label="Select model">
+              <option value="openrouter/auto">openrouter/auto — Auto Router (default)</option>
+            </select>
+            <p id="model-hint" class="mt-1.5 text-[.65rem] leading-relaxed text-zinc-600">Type a key, then click Discover to load every currently available model.</p>
+          </div>
+        </div>
+
+        <!-- 2. INTEGRATIONS VAULT -->
+        <div class="glass rounded-2xl p-5">
+          <div class="mb-4 flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <div class="grid h-7 w-7 place-items-center rounded-lg border border-zinc-700/80 bg-zinc-800/60">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div>
+                <h2 class="text-[.82rem] font-semibold text-zinc-100">Integrations &amp; API Keys</h2>
+                <p class="text-[.68rem] text-zinc-500">Tavily · Resend · Discord — saved to <span class="mono">localStorage</span></p>
+              </div>
+            </div>
+            <span class="badge badge-iris">vault</span>
+          </div>
+
+          <div class="flex flex-col gap-3.5">
+            <div>
+              <div class="mb-1.5 flex items-center justify-between gap-2">
+                <label for="tavily-api-key" class="text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Tavily Search Key</label>
+                <span id="env-badge-tavily" class="badge badge-empty">env: not set</span>
+              </div>
+              <div class="relative">
+                <input id="tavily-api-key" type="password" class="field pr-9" placeholder="tvly-… live web search" autocomplete="off" spellcheck="false" />
+                <button type="button" class="eye absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 transition hover:text-zinc-200" data-toggle="tavily-api-key" aria-label="Show or hide Tavily key">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <div>
+                <div class="mb-1.5 flex items-center justify-between gap-2">
+                  <label for="resend-api-key" class="text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Resend Key</label>
+                  <span id="env-badge-resend" class="badge badge-empty">env: not set</span>
+                </div>
+                <div class="relative">
+                  <input id="resend-api-key" type="password" class="field pr-9" placeholder="re_…" autocomplete="off" spellcheck="false" />
+                  <button type="button" class="eye absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 transition hover:text-zinc-200" data-toggle="resend-api-key" aria-label="Show or hide Resend key">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label for="resend-from-email" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">From Email</label>
+                <input id="resend-from-email" type="email" class="field mono" placeholder="onboarding@resend.dev" autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+
+            <div>
+              <div class="mb-1.5 flex items-center justify-between gap-2">
+                <label for="discord-webhook-url" class="text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Discord Webhook</label>
+                <span id="env-badge-discord" class="badge badge-empty">env: not set</span>
+              </div>
+              <div class="relative">
+                <input id="discord-webhook-url" type="password" class="field pr-9" placeholder="https://discord.com/api/webhooks/…" autocomplete="off" spellcheck="false" />
+                <button type="button" class="eye absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 transition hover:text-zinc-200" data-toggle="discord-webhook-url" aria-label="Show or hide Discord webhook">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button id="save-keys" type="button" class="btn btn-ghost px-3 py-1.5 text-[.72rem]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+              Save keys
+            </button>
+            <button id="clear-keys" type="button" class="btn btn-ghost px-3 py-1.5 text-[.72rem]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+              Clear saved keys
+            </button>
+            <span class="ml-auto text-[.625rem] text-zinc-600">Never sent anywhere except your own server.</span>
+          </div>
+        </div>
+
+        <!-- 3. DIGEST GENERATOR -->
+        <form id="digest-form" class="glass rounded-2xl p-5" novalidate>
+          <div class="mb-4 flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <div class="grid h-7 w-7 place-items-center rounded-lg border border-zinc-700/80 bg-zinc-800/60">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg>
+              </div>
+              <div>
+                <h2 class="text-[.82rem] font-semibold text-zinc-100">New Digest</h2>
+                <p class="text-[.68rem] text-zinc-500">Research → synthesize → deliver</p>
+              </div>
+            </div>
+            <span id="form-model-badge" class="badge badge-iris badge-model">openrouter/auto</span>
+          </div>
+
+          <label for="topic-input" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Research topic</label>
+          <textarea id="topic-input" class="field scrollbar-thin min-h-[92px] resize-y font-sans text-[.84rem] leading-relaxed" rows="3" dir="auto" placeholder="e.g. The state of open-weight LLMs in 2026 — or 「آینده مدل‌های زبانی باز»" required></textarea>
+
+          <div class="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div>
+              <label for="recipient-email" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Recipient email</label>
+              <input id="recipient-email" type="email" class="field mono" placeholder="you@company.com" autocomplete="email" />
+            </div>
+            <div>
+              <label for="output-language" class="mb-1.5 block text-[.665rem] font-semibold uppercase tracking-[.09em] text-zinc-500">Output language</label>
+              <select id="output-language" class="field" aria-label="Output language for the digest">
+                <option value="auto">🌐 Auto (Same as Topic Language)</option>
+                <option value="Persian">🇮🇷 Persian (فارسی)</option>
+                <option value="English">🇺🇸 English</option>
+                <option value="Arabic">🇸🇦 Arabic (العربية)</option>
+                <option value="German">🇩🇪 German</option>
+                <option value="French">🇫🇷 French</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-1 gap-2 pb-0.5 sm:col-span-2 sm:grid-cols-2">
+              <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/90 bg-zinc-950/50 px-3 py-2">
+                <span class="flex items-center gap-2 text-[.72rem] text-zinc-300">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+                  Email digest
+                </span>
+                <input id="notify-email" type="checkbox" class="sr-only" />
+                <span class="toggle" aria-hidden="true"></span>
+              </label>
+              <label class="flex items-center justify-between gap-3 rounded-xl border border-zinc-800/90 bg-zinc-950/50 px-3 py-2">
+                <span class="flex items-center gap-2 text-[.72rem] text-zinc-300">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                  Discord alert
+                </span>
+                <input id="notify-discord" type="checkbox" class="sr-only" />
+                <span class="toggle" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+
+          <button id="run-digest" type="submit" class="btn btn-primary mt-4 w-full py-2.5 text-[.82rem]">
+            <svg id="run-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3 14 9-14 9V3Z"/></svg>
+            <span id="run-label">Run autonomous digest</span>
+            <kbd class="mono ml-1 hidden rounded border border-black/20 bg-black/10 px-1.5 py-0.5 text-[.6rem] sm:inline">⌘↵</kbd>
+          </button>
+          <p class="mt-2 text-center text-[.625rem] text-zinc-600">Live Tavily search · cited Markdown report · optional delivery</p>
+        </form>
+      </section>
+
+      <!-- ================= RIGHT COLUMN: WORKSPACE ================= -->
+      <section class="flex flex-col gap-6 xl:col-span-7">
+        <!-- PROGRESS -->
+        <div id="progress-card" class="glass hidden rounded-2xl p-5" aria-live="polite">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="relative flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
+              <h2 class="text-[.82rem] font-semibold text-zinc-100">Pipeline running</h2>
+            </div>
+            <span id="progress-elapsed" class="mono text-[.68rem] text-zinc-500">0.0s</span>
+          </div>
+          <div id="progress-steps" class="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div class="step flex items-center gap-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-2.5" data-step="1" data-state="pending">
+              <span class="step-dot" aria-hidden="true"></span>
+              <div>
+                <p class="step-label text-[.72rem] font-medium">Searching Web via Tavily</p>
+                <p class="mono text-[.58rem] uppercase tracking-wider text-zinc-600">step 01</p>
+              </div>
+            </div>
+            <div class="step flex items-center gap-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-2.5" data-step="2" data-state="pending">
+              <span class="step-dot" aria-hidden="true"></span>
+              <div>
+                <p class="step-label text-[.72rem] font-medium">Synthesizing with AI</p>
+                <p class="mono text-[.58rem] uppercase tracking-wider text-zinc-600">step 02</p>
+              </div>
+            </div>
+            <div class="step flex items-center gap-2.5 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-2.5" data-step="3" data-state="pending">
+              <span class="step-dot" aria-hidden="true"></span>
+              <div>
+                <p class="step-label text-[.72rem] font-medium">Dispatching Alerts</p>
+                <p class="mono text-[.58rem] uppercase tracking-wider text-zinc-600">step 03</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 h-1 w-full overflow-hidden rounded-full bg-zinc-800/80">
+            <div id="progress-bar" class="meter-fill h-full w-0 rounded-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-indigo-400"></div>
+          </div>
+        </div>
+
+        <!-- ERROR BANNER -->
+        <div id="error-banner" class="hidden rounded-2xl border border-red-500/35 bg-red-500/[0.07] p-4 fade-in" role="alert">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 grid h-7 w-7 flex-none place-items-center rounded-lg border border-red-500/40 bg-red-500/15">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <h2 class="text-[.8rem] font-semibold text-red-200">Request failed</h2>
+                <button id="dismiss-error" type="button" class="rounded p-1 text-red-300/70 transition hover:bg-red-500/10 hover:text-red-200" aria-label="Dismiss error">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <p id="error-detail" class="mt-1 break-words text-[.78rem] leading-relaxed text-red-100/90" dir="auto"></p>
+              <ul id="error-tips" class="mt-2.5 flex flex-col gap-1 text-[.7rem] text-red-200/70"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- RESULT READER -->
+        <div id="result-card" class="glass hidden overflow-hidden rounded-2xl">
+          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-800/80 bg-zinc-950/40 px-5 py-4">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="badge badge-env">digest ready</span>
+                <span id="result-model" class="badge badge-iris badge-model mono">—</span>
+                <span id="result-time" class="mono text-[.65rem] text-zinc-600">—</span>
+              </div>
+              <h2 id="result-topic" class="mt-2 truncate text-[1.02rem] font-semibold tracking-tight text-white" dir="auto">—</h2>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="copy-markdown" type="button" class="btn btn-ghost px-2.5 py-1.5 text-[.7rem]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                Copy Markdown
+              </button>
+              <button id="download-markdown" type="button" class="btn btn-ghost px-2.5 py-1.5 text-[.7rem]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+                Download .md
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 border-b border-zinc-800/70 px-5 py-3">
+            <span class="badge badge-empty" title="End-to-end execution time">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span id="metric-latency">0 ms</span>
+            </span>
+            <span class="badge badge-empty" title="Total tokens">
+              <span id="metric-tokens">0</span> tokens
+              <span class="text-zinc-600">(<span id="metric-prompt">0</span>↑ <span id="metric-completion">0</span>↓)</span>
+            </span>
+            <span class="badge badge-amber" title="Estimated USD cost">
+              <span class="mono">$<span id="metric-cost">0.000000</span></span>
+            </span>
+            <span class="ml-auto flex flex-wrap items-center gap-2">
+              <span id="pill-email" class="badge badge-empty">email · not sent</span>
+              <span id="pill-discord" class="badge badge-empty">discord · not sent</span>
+              <span id="pill-source" class="badge badge-iris">source · tavily</span>
+            </span>
+          </div>
+
+          <div class="scrollbar-thin max-h-[42rem] overflow-y-auto px-5 py-5 sm:px-6">
+            <article id="result-markdown" class="prose-pd" dir="auto"></article>
+          </div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div id="empty-state" class="glass flex flex-col items-center justify-center rounded-2xl px-6 py-12 text-center">
+          <div class="grid h-12 w-12 place-items-center rounded-2xl border border-zinc-700/70 bg-zinc-800/40">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#52525B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9l6 6v10a2 2 0 0 1-1 2Z"/><path d="M9 13h6M9 17h4"/></svg>
+          </div>
+          <h2 class="mt-4 text-[.9rem] font-semibold text-zinc-200">No digest yet</h2>
+          <p class="mt-1.5 max-w-sm text-[.76rem] leading-relaxed text-zinc-500">
+            Configure your keys, pick a model from Live Discovery, then describe a topic. 
+            The cited executive report will stream in here.
+          </p>
+          <div class="mt-5 flex flex-wrap items-center justify-center gap-1.5">
+            <button type="button" class="chip example-topic">AI coding agents 2026</button>
+            <button type="button" class="chip example-topic">EU AI Act compliance</button>
+            <button type="button" class="chip example-topic">Quantum error correction</button>
+          </div>
+        </div>
+
+        <!-- TELEMETRY & UPDATES -->
+        <div class="glass rounded-2xl p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="grid h-7 w-7 place-items-center rounded-lg border border-zinc-700/80 bg-zinc-800/60">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+              </div>
+              <div>
+                <h2 class="text-[.82rem] font-semibold text-zinc-100">Telemetry &amp; Updates</h2>
+                <p class="text-[.68rem] text-zinc-500">Aggregate cost · self-updating watchdog</p>
+              </div>
+            </div>
+            <span class="badge badge-empty" id="updates-status">not checked</span>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <div class="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-3">
+              <p class="text-[.6rem] uppercase tracking-[.1em] text-zinc-600">Requests</p>
+              <p id="stats-requests" class="mono mt-1 text-[1.05rem] font-semibold text-zinc-100">0</p>
+            </div>
+            <div class="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-3">
+              <p class="text-[.6rem] uppercase tracking-[.1em] text-zinc-600">Tokens</p>
+              <p id="stats-tokens" class="mono mt-1 text-[1.05rem] font-semibold text-zinc-100">0</p>
+            </div>
+            <div class="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-3">
+              <p class="text-[.6rem] uppercase tracking-[.1em] text-zinc-600">Total cost</p>
+              <p id="stats-cost" class="mono mt-1 text-[1.05rem] font-semibold text-emerald-300">$0.000000</p>
+            </div>
+            <div class="rounded-xl border border-zinc-800/80 bg-zinc-950/50 p-3">
+              <p class="text-[.6rem] uppercase tracking-[.1em] text-zinc-600">Delivered</p>
+              <p class="mono mt-1 text-[1.05rem] font-semibold text-zinc-100"><span id="stats-emails">0</span><span class="text-zinc-600"> mail · </span><span id="stats-discord">0</span><span class="text-zinc-600"> dc</span></p>
+            </div>
+          </div>
+
+          <div id="updates-list" class="mt-3 flex flex-col gap-1.5"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-10 flex flex-col items-center justify-between gap-3 border-t border-zinc-800/70 pt-5 text-[.68rem] text-zinc-600 sm:flex-row">
+      <p>PulseDigest AI · open-source autonomous research microservice</p>
+      <p class="mono">FastAPI · LangChain · Tavily · Resend · Discord</p>
+    </footer>
+  </div>
+
+  <!-- Toast stack -->
+  <div id="toast-stack" class="pointer-events-none fixed bottom-5 right-5 z-50 flex w-[min(22rem,calc(100vw-2.5rem))] flex-col gap-2" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const $ = (id) => document.getElementById(id);
+      const LS = {
+        provider: 'pd.provider',
+        providerKeys: 'pd.providerKeys',
+        legacyKey: 'pd.llmKey',
+        baseUrl: 'pd.baseUrl',
+        model: 'pd.model',
+        tavily: 'pd.tavily',
+        resend: 'pd.resend',
+        resendFrom: 'pd.resendFrom',
+        discord: 'pd.discord',
+        theme: 'pd.theme',
+        outputLang: 'pd.outputLang'
+      };
+      const SECRET_FIELDS = ['llm-api-key', 'tavily-api-key', 'resend-api-key', 'discord-webhook-url'];
+      // Cleared by "Clear saved keys" (theme/language/model survive on purpose).
+      const VAULT_KEYS = [
+        LS.providerKeys, LS.legacyKey, LS.tavily, LS.resend, LS.resendFrom,
+        LS.discord, LS.baseUrl
+      ];
+
+      const state = {
+        models: [],
+        filter: 'all',
+        search: '',
+        running: false,
+        env: { providers_configured: {} },
+        envFingerprints: {},
+        providerKeys: {},
+        activeProvider: '',
+        lastMarkdown: '',
+        lastTopic: '',
+        timer: null,
+        startedAt: 0
+      };
+
+      /* ---------------- helpers ---------------- */
+
+      function fmtInt(value) {
+        return Number(value || 0).toLocaleString('en-US');
+      }
+
+      function fmtCost(value) {
+        return Number(value || 0).toFixed(6);
+      }
+
+      function fmtDuration(ms) {
+        const value = Number(ms || 0);
+        if (value < 1000) return value + ' ms';
+        return (value / 1000).toFixed(2) + ' s';
+      }
+
+      function fmtContext(length) {
+        if (!length) return '';
+        if (length >= 1000000) return (length / 1000000).toFixed(1) + 'M ctx';
+        if (length >= 1000) return Math.round(length / 1000) + 'K ctx';
+        return length + ' ctx';
+      }
+
+      function maskKey(key) {
+        const value = String(key || '').trim();
+        if (!value) return '';
+        if (value.length <= 11) return value.slice(0, 2) + '…' + value.slice(-2);
+        return value.slice(0, 7) + '…' + value.slice(-4);
+      }
+
+      function readStorage(key) {
+        try {
+          return localStorage.getItem(key);
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function writeStorage(key, value) {
+        try {
+          if (value === null || value === undefined || value === '') localStorage.removeItem(key);
+          else localStorage.setItem(key, value);
+        } catch (error) {
+          /* private mode: ignore */
+        }
+      }
+
+      function readProviderKeys() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(LS.providerKeys) || '{}');
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+          return {};
+        }
+      }
+
+      /* ---------------- day / night theme ---------------- */
+
+      function applyTheme(theme) {
+        const light = theme === 'light';
+        document.documentElement.classList.toggle('light', light);
+        document.documentElement.classList.toggle('dark', !light);
+        const button = $('theme-toggle');
+        if (!button) return;
+        $('theme-label').textContent = light ? 'Light' : 'Dark';
+        $('theme-icon-sun').classList.toggle('hidden', !light);
+        $('theme-icon-moon').classList.toggle('hidden', light);
+        button.setAttribute('aria-pressed', String(light));
+        button.title = light ? 'Switch to night mode' : 'Switch to day mode';
+      }
+
+      function setTheme(theme) {
+        applyTheme(theme);
+        writeStorage(LS.theme, theme);
+      }
+
+      function toast(message, kind) {
+        const palette = {
+          ok: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100',
+          err: 'border-red-500/40 bg-red-500/10 text-red-100',
+          info: 'border-zinc-700 bg-zinc-900/90 text-zinc-200'
+        };
+        const node = document.createElement('div');
+        node.className = 'pointer-events-auto flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-[.75rem] shadow-card backdrop-blur-md fade-in ' + (palette[kind] || palette.info);
+        node.textContent = message;
+        $('toast-stack').appendChild(node);
+        setTimeout(() => {
+          node.style.transition = 'opacity .25s ease, transform .25s ease';
+          node.style.opacity = '0';
+          node.style.transform = 'translateY(6px)';
+          setTimeout(() => node.remove(), 260);
+        }, 3200);
+      }
+
+      function setBadge(el, configured, onText, offText) {
+        if (!el) return;
+        el.className = 'badge ' + (configured ? 'badge-env' : 'badge-empty');
+        el.textContent = configured ? onText : offText;
+      }
+
+      function extractDetail(data, fallback) {
+        if (!data) return fallback || 'Unknown error';
+        const detail = data.detail !== undefined ? data.detail : data;
+        if (typeof detail === 'string') return detail;
+        if (Array.isArray(detail)) {
+          return detail.map((item) => {
+            if (item && typeof item === 'object') {
+              const loc = Array.isArray(item.loc) ? item.loc.filter((p) => p !== 'body').join('.') : '';
+              return (loc ? loc + ': ' : '') + (item.msg || JSON.stringify(item));
+            }
+            return String(item);
+          }).join(' · ');
+        }
+        if (typeof detail === 'object') return detail.msg || JSON.stringify(detail);
+        return String(detail);
+      }
+
+      async function api(path, options) {
+        const response = await fetch(path, options);
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = null;
+        }
+        return { ok: response.ok, status: response.status, data: data };
+      }
+
+      /* ---------------- persistence ---------------- */
+
+      function storeCurrentProviderKey() {
+        const provider = state.activeProvider || $('provider-select').value;
+        if (!provider) return;
+        const value = $('llm-api-key').value.trim();
+        if (value) state.providerKeys[provider] = value;
+        else delete state.providerKeys[provider];
+      }
+
+      function loadProviderKey(provider) {
+        state.activeProvider = provider;
+        $('llm-api-key').value = state.providerKeys[provider] || '';
+        renderKeySource();
+      }
+
+      function renderKeySource() {
+        const label = $('key-source');
+        if (!label) return;
+        const provider = $('provider-select').value;
+        const typed = $('llm-api-key').value.trim();
+        const envFingerprint = (state.envFingerprints || {})[provider] || '';
+        const useEnv = $('use-env-key');
+
+        if (typed) {
+          label.className = 'mono text-[.6rem] leading-tight text-emerald-400';
+          label.textContent = 'Active key: UI Override (' + maskKey(typed) + ')';
+          label.dataset.source = 'override';
+          useEnv.classList.toggle('hidden', !envFingerprint);
+          return;
+        }
+        if (envFingerprint) {
+          label.className = 'mono text-[.6rem] leading-tight text-emerald-400';
+          label.textContent = 'Active key: Server .env (' + envFingerprint + ')';
+          label.dataset.source = 'env';
+          useEnv.classList.add('hidden');
+          return;
+        }
+        label.className = 'mono text-[.6rem] leading-tight text-zinc-500';
+        label.textContent = 'No key yet — paste one or add it to .env';
+        label.dataset.source = 'missing';
+        useEnv.classList.add('hidden');
+      }
+
+      function persist() {
+        storeCurrentProviderKey();
+        const pairs = [
+          [LS.provider, $('provider-select').value],
+          [LS.baseUrl, $('custom-base-url').value.trim()],
+          [LS.model, $('model-select').value],
+          [LS.tavily, $('tavily-api-key').value.trim()],
+          [LS.resend, $('resend-api-key').value.trim()],
+          [LS.resendFrom, $('resend-from-email').value.trim()],
+          [LS.discord, $('discord-webhook-url').value.trim()]
+        ];
+        pairs.forEach(([key, value]) => writeStorage(key, value));
+        writeStorage(LS.providerKeys, JSON.stringify(state.providerKeys));
+      }
+
+      function restore() {
+        const provider = readStorage(LS.provider);
+        if (provider && Array.prototype.some.call($('provider-select').options, (o) => o.value === provider)) {
+          $('provider-select').value = provider;
+        }
+        state.activeProvider = $('provider-select').value;
+        state.providerKeys = readProviderKeys();
+
+        // One-time migration of the old single-key vault (which could leak an
+        // NVIDIA key into OpenRouter when providers were switched).
+        const legacyKey = readStorage(LS.legacyKey);
+        if (legacyKey && !state.providerKeys[state.activeProvider]) {
+          state.providerKeys[state.activeProvider] = legacyKey.trim();
+        }
+        writeStorage(LS.legacyKey, null);
+
+        $('llm-api-key').value = state.providerKeys[state.activeProvider] || '';
+        $('custom-base-url').value = readStorage(LS.baseUrl) || '';
+        $('tavily-api-key').value = readStorage(LS.tavily) || '';
+        $('resend-api-key').value = readStorage(LS.resend) || '';
+        $('resend-from-email').value = readStorage(LS.resendFrom) || '';
+        $('discord-webhook-url').value = readStorage(LS.discord) || '';
+
+        const language = readStorage(LS.outputLang);
+        if (language && Array.prototype.some.call($('output-language').options, (o) => o.value === language)) {
+          $('output-language').value = language;
+        }
+
+        const model = readStorage(LS.model);
+        if (model) {
+          const option = document.createElement('option');
+          option.value = model;
+          option.textContent = model;
+          $('model-select').appendChild(option);
+          $('model-select').value = model;
+        }
+
+        applyTheme(readStorage(LS.theme) === 'light' ? 'light' : 'dark');
+        syncProviderUi();
+        syncModelBadges();
+        renderKeySource();
+      }
+
+      function clearVault() {
+        VAULT_KEYS.forEach((key) => writeStorage(key, null));
+        state.providerKeys = {};
+        SECRET_FIELDS.forEach((id) => {
+          $(id).value = '';
+          $(id).type = 'password';
+        });
+        $('resend-from-email').value = '';
+        $('custom-base-url').value = '';
+        renderKeySource();
+        toast('Saved keys cleared from this browser', 'ok');
+      }
+
+      /* ---------------- providers & env status ---------------- */
+
+      async function loadProviders() {
+        try {
+          const result = await api('/api/v1/providers');
+          if (!result.ok || !result.data) return;
+          const env = result.data.env_status || {};
+          state.env = env;
+          state.envFingerprints = result.data.env_fingerprints || {};
+          renderEnvBadges();
+          renderKeySource();
+          let savedProvider = null;
+          try {
+            savedProvider = localStorage.getItem(LS.provider);
+          } catch (error) {
+            savedProvider = null;
+          }
+          if (!$('llm-api-key').value && !savedProvider) {
+            $('provider-select').value = result.data.default_provider || 'openrouter';
+          }
+          syncProviderUi();
+        } catch (error) {
+          /* dashboard still works without the endpoint */
+        }
+      }
+
+      function renderEnvBadges() {
+        setBadge($('env-badge-tavily'), Boolean(state.env.tavily_configured), 'env: ready', 'env: not set');
+        setBadge($('env-badge-resend'), Boolean(state.env.resend_configured), 'env: ready', 'env: not set');
+        setBadge($('env-badge-discord'), Boolean(state.env.discord_configured), 'env: ready', 'env: not set');
+        const configured = state.env.providers_configured || {};
+        const provider = $('provider-select').value;
+        setBadge($('provider-env-badge'), Boolean(configured[provider]), 'env key ready', 'no env key');
+      }
+
+      function syncProviderUi() {
+        const isCustom = $('provider-select').value === 'custom';
+        $('custom-base-url-wrap').classList.toggle('hidden', !isCustom);
+        renderEnvBadges();
+        renderKeySource();
+      }
+
+      function syncModelBadges() {
+        const model = $('model-select').value || 'openrouter/auto';
+        $('form-model-badge').textContent = model.length > 34 ? model.slice(0, 32) + '…' : model;
+        $('header-model').textContent = model;
+      }
+
+      /* ---------------- live model discovery ---------------- */
+
+      const FILTERS = {
+        all: () => true,
+        free: (m) => m.id.toLowerCase().includes(':free'),
+        gpt: (m) => /gpt|o[1-9]|chatgpt/i.test(m.id),
+        claude: (m) => /claude|anthropic/i.test(m.id + ' ' + (m.name || '')),
+        gemini: (m) => /gemini|google/i.test(m.id + ' ' + (m.name || '')),
+        deepseek: (m) => /deepseek/i.test(m.id),
+        llama: (m) => /llama|meta/i.test(m.id + ' ' + (m.name || ''))
+      };
+
+      function visibleModels() {
+        const query = state.search.trim().toLowerCase();
+        const predicate = FILTERS[state.filter] || FILTERS.all;
+        return state.models.filter((model) => {
+          if (!predicate(model)) return false;
+          if (!query) return true;
+          return (
+            model.id.toLowerCase().includes(query) ||
+            String(model.name || '').toLowerCase().includes(query)
+          );
+        });
+      }
+
+      function applyFilter() {
+        const select = $('model-select');
+        const previous = select.value;
+        const models = visibleModels();
+        select.innerHTML = '';
+
+        if (!state.models.length) {
+          const option = document.createElement('option');
+          option.value = previous || 'openrouter/auto';
+          option.textContent = (previous || 'openrouter/auto') + ' — default';
+          select.appendChild(option);
+          $('model-counter').textContent = '0 models';
+          return;
+        }
+
+        if (!models.length) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = 'No models match this filter';
+          select.appendChild(option);
+        } else {
+          models.forEach((model) => {
+            const option = document.createElement('option');
+            option.value = model.id;
+            const ctx = fmtContext(model.context_length);
+            option.textContent = ctx ? model.id + ' · ' + ctx : model.id;
+            select.appendChild(option);
+          });
+          const keep = models.some((model) => model.id === previous);
+          select.value = keep ? previous : models[0].id;
+        }
+
+        $('model-counter').textContent = 'Showing ' + models.length + ' of ' + state.models.length + ' models';
+        $('model-counter').className = 'badge badge-counter ' + (models.length ? 'badge-env' : 'badge-amber');
+        $('model-hint').textContent = models.length
+          ? 'Live from the provider /models endpoint · filtered instantly'
+          : 'No model matches this filter — clear the search or pick another provider.';
+        persist();
+        syncModelBadges();
+      }
+
+      async function discoverModels(options) {
+        const silent = Boolean(options && options.silent);
+        const provider = $('provider-select').value;
+        const apiKey = $('llm-api-key').value.trim();
+        const baseUrl = $('custom-base-url').value.trim();
+        const button = $('discover-models');
+
+        if (!apiKey && !state.env.providers_configured?.[provider]) {
+          if (!silent) {
+            showError('No API key for provider "' + provider + '".', 401, [
+              'Paste the provider key in the vault above — it is saved only in this browser.',
+              'Or set it once in .env and restart the server, then reload this page.'
+            ]);
+          }
+          return;
+        }
+
+        button.disabled = true;
+        const original = button.innerHTML;
+        button.textContent = 'Discovering…';
+        try {
+          const result = await api('/api/v1/models/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              provider: provider,
+              api_key_override: apiKey || null,
+              custom_base_url: provider === 'custom' ? baseUrl || null : null
+            })
+          });
+          if (!result.ok) {
+            if (!silent) showError(extractDetail(result.data, 'Live discovery failed'), result.status);
+            return;
+          }
+          state.models = result.data && Array.isArray(result.data.models) ? result.data.models : [];
+          state.search = '';
+          $('model-search').value = '';
+          setFilter('all');
+          applyFilter();
+          if (!state.models.length) {
+            toast('Provider returned no available models', 'info');
+          } else {
+            toast(state.models.length + ' live models loaded', 'ok');
+            hideError();
+          }
+        } catch (error) {
+          if (!silent) showError('Could not reach the discovery endpoint: ' + error.message, 502);
+        } finally {
+          button.disabled = false;
+          button.innerHTML = original;
+        }
+      }
+
+      function setFilter(name) {
+        state.filter = name;
+        $('filter-chips').querySelectorAll('.chip').forEach((chip) => {
+          chip.classList.toggle('active', chip.dataset.filter === name);
+        });
+      }
+
+      /* ---------------- error + progress ---------------- */
+
+      function showError(detail, status, tips) {
+        $('error-detail').textContent = detail || 'Unexpected error';
+        const list = $('error-tips');
+        list.innerHTML = '';
+        const suggestions = tips || errorTipsFor(status);
+        suggestions.forEach((tip) => {
+          const item = document.createElement('li');
+          item.className = 'flex gap-1.5';
+          const marker = document.createElement('span');
+          marker.className = 'text-red-400/70';
+          marker.textContent = '→';
+          const text = document.createElement('span');
+          text.textContent = tip;
+          item.append(marker, text);
+          list.appendChild(item);
+        });
+        const banner = $('error-banner');
+        banner.classList.remove('hidden');
+        banner.classList.remove('fade-in');
+        void banner.offsetWidth;
+        banner.classList.add('fade-in');
+      }
+
+      function errorTipsFor(status) {
+        if (status === 401 || status === 403) {
+          return [
+            'Check the “Active key” line under the key box — UI Override beats Server .env.',
+            'Re-paste the key — quotes, spaces and placeholders are stripped automatically.',
+            'Confirm the key is active and funded on the provider dashboard.',
+            'Click “× Use server .env instead” if the server key is the valid one.'
+          ];
+        }
+        if (status === 429) {
+          return [
+            'The provider is rate-limiting you — wait a few seconds.',
+            'Try a ⚡ Free model or another provider from Live Discovery.'
+          ];
+        }
+        if (status === 400) {
+          return [
+            'The model id may not exist for this provider — run Discover Live Models.',
+            'Custom endpoints must be OpenAI-compatible and include the /v1 suffix.',
+            'Some accounts block specific models or regions.'
+          ];
+        }
+        if (status === 422) {
+          return [
+            'Check the topic (min 3 characters) and the recipient email format.',
+            'Custom base URLs must start with http:// or https://.'
+          ];
+        }
+        if (status === 502 || status === 503) {
+          return [
+            'Upstream provider hiccup — retry in a moment.',
+            'Another model from Live Discovery will usually succeed.'
+          ];
+        }
+        return [
+          'Check the server console for the full traceback.',
+          'Verify .env keys and outbound network connectivity.'
+        ];
+      }
+
+      function hideError() {
+        $('error-banner').classList.add('hidden');
+      }
+
+      function setStep(step, status) {
+        const node = $('progress-steps').querySelector('[data-step="' + step + '"]');
+        if (node) node.dataset.state = status;
+      }
+
+      function startProgress() {
+        state.startedAt = performance.now();
+        $('progress-card').classList.remove('hidden');
+        [1, 2, 3].forEach((step) => setStep(step, 'pending'));
+        setStep(1, 'active');
+        $('progress-bar').style.width = '6%';
+        clearInterval(state.timer);
+        state.timer = setInterval(() => {
+          const elapsed = (performance.now() - state.startedAt) / 1000;
+          $('progress-elapsed').textContent = elapsed.toFixed(1) + 's';
+          $('progress-bar').style.width = Math.min(92, 6 + elapsed * 8) + '%';
+          if (elapsed > 1.6) {
+            setStep(1, 'done');
+            if (document.querySelector('[data-step="2"]').dataset.state !== 'done') setStep(2, 'active');
+          }
+          if (elapsed > 3.4) {
+            setStep(2, 'done');
+            setStep(3, 'active');
+          }
+        }, 120);
+      }
+
+      function stopProgress(success) {
+        clearInterval(state.timer);
+        state.timer = null;
+        if (success) {
+          [1, 2, 3].forEach((step) => setStep(step, 'done'));
+          $('progress-bar').style.width = '100%';
+          setTimeout(() => $('progress-card').classList.add('hidden'), 900);
+        } else {
+          [1, 2, 3].forEach((step) => {
+            const node = $('progress-steps').querySelector('[data-step="' + step + '"]');
+            if (node && node.dataset.state === 'active') node.dataset.state = 'pending';
+          });
+          $('progress-card').classList.add('hidden');
+        }
+      }
+
+      function setRunning(running) {
+        state.running = running;
+        const button = $('run-digest');
+        button.disabled = running;
+        $('run-label').textContent = running ? 'Running pipeline…' : 'Run autonomous digest';
+        $('run-icon').style.display = running ? 'none' : '';
+        $('discover-models').disabled = running;
+      }
+
+      /* ---------------- markdown + result ---------------- */
+
+      function renderMarkdown(markdown) {
+        const target = $('result-markdown');
+        target.style.whiteSpace = '';
+        if (window.marked && window.DOMPurify) {
+          try {
+            const raw = window.marked.parse(String(markdown || ''), { gfm: true, breaks: true });
+            target.innerHTML = window.DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+            return;
+          } catch (error) {
+            /* fall through to safe text rendering */
+          }
+        }
+        target.textContent = String(markdown || '');
+        target.style.whiteSpace = 'pre-wrap';
+      }
+
+      function pill(el, sent, label) {
+        el.className = 'badge ' + (sent ? 'badge-env' : 'badge-empty');
+        el.textContent = label + ' · ' + (sent ? 'sent' : 'skipped');
+      }
+
+      function renderResult(data, elapsedMs) {
+        state.lastMarkdown = String(data.report_markdown || '');
+        state.lastTopic = String(data.topic || 'digest');
+
+        $('empty-state').classList.add('hidden');
+        const card = $('result-card');
+        card.classList.remove('hidden');
+        card.classList.remove('fade-in');
+        void card.offsetWidth;
+        card.classList.add('fade-in');
+
+        $('result-topic').textContent = data.topic || 'Untitled digest';
+        $('result-model').textContent = (data.provider || 'llm') + ' · ' + (data.model_name || 'auto');
+        const created = data.created_at ? new Date(data.created_at) : new Date();
+        $('result-time').textContent = created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const latency = data.latency_ms !== undefined && data.latency_ms !== null ? data.latency_ms : elapsedMs;
+        $('metric-latency').textContent = fmtDuration(latency);
+        $('metric-tokens').textContent = fmtInt(data.tokens_used);
+        $('metric-cost').textContent = fmtCost(data.estimated_cost_usd);
+
+        const notifications = data.notifications || {};
+        pill($('pill-email'), Boolean(notifications.email && notifications.email.sent), 'email');
+        pill($('pill-discord'), Boolean(notifications.discord && notifications.discord.sent), 'discord');
+
+        const tavilyReady = Boolean($('tavily-api-key').value.trim() || state.env.tavily_configured);
+        $('pill-source').className = 'badge ' + (tavilyReady ? 'badge-iris' : 'badge-amber');
+        $('pill-source').textContent = 'source · tavily ' + (tavilyReady ? 'live' : 'mock');
+
+        renderMarkdown(state.lastMarkdown);
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      /* ---------------- run digest ---------------- */
+
+      function buildPayload() {
+        const provider = $('provider-select').value;
+        const integrations = {};
+        const tavily = $('tavily-api-key').value.trim();
+        const resend = $('resend-api-key').value.trim();
+        const resendFrom = $('resend-from-email').value.trim();
+        const discord = $('discord-webhook-url').value.trim();
+        if (tavily) integrations.tavily_api_key = tavily;
+        if (resend) integrations.resend_api_key = resend;
+        if (resendFrom) integrations.resend_from_email = resendFrom;
+        if (discord) integrations.discord_webhook_url = discord;
+
+        const recipient = $('recipient-email').value.trim();
+        const payload = {
+          topic: $('topic-input').value.trim(),
+          recipient_email: recipient || null,
+          notify_email: $('notify-email').checked && Boolean(recipient),
+          notify_discord: $('notify-discord').checked,
+          output_language: $('output-language').value || 'auto',
+          llm_config: {
+            provider: provider,
+            model_name: $('model-select').value || 'openrouter/auto',
+            custom_base_url: provider === 'custom' ? $('custom-base-url').value.trim() || null : null,
+            api_key_override: $('llm-api-key').value.trim() || null
+          }
+        };
+        if (Object.keys(integrations).length) payload.integrations_config = integrations;
+        return payload;
+      }
+
+      async function runDigest(event) {
+        if (event) event.preventDefault();
+        if (state.running) return;
+
+        const payload = buildPayload();
+        if (payload.topic.length < 3) {
+          showError('Please enter a research topic of at least 3 characters.', 422);
+          $('topic-input').focus();
+          return;
+        }
+
+        hideError();
+        setRunning(true);
+        startProgress();
+        const startedAt = performance.now();
+
+        try {
+          const result = await api('/api/v1/digest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!result.ok) {
+            stopProgress(false);
+            showError(extractDetail(result.data, 'Digest generation failed'), result.status);
+            return;
+          }
+          stopProgress(true);
+          renderResult(result.data || {}, Math.round(performance.now() - startedAt));
+          toast('Digest ready', 'ok');
+          loadStats();
+        } catch (error) {
+          stopProgress(false);
+          showError('Network error: ' + error.message, 502);
+        } finally {
+          setRunning(false);
+          persist();
+        }
+      }
+
+      async function copyMarkdown() {
+        if (!state.lastMarkdown) return;
+        try {
+          await navigator.clipboard.writeText(state.lastMarkdown);
+          toast('Markdown copied to clipboard', 'ok');
+        } catch (error) {
+          const area = document.createElement('textarea');
+          area.value = state.lastMarkdown;
+          document.body.appendChild(area);
+          area.select();
+          try {
+            document.execCommand('copy');
+            toast('Markdown copied', 'ok');
+          } catch (fallbackError) {
+            toast('Clipboard blocked by the browser', 'err');
+          }
+          area.remove();
+        }
+      }
+
+      function downloadMarkdown() {
+        if (!state.lastMarkdown) return;
+        const slug = state.lastTopic.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'digest';
+        const blob = new Blob([state.lastMarkdown], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'pulsedigest-' + slug + '.md';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      }
+
+      /* ---------------- telemetry ---------------- */
+
+      async function loadStats() {
+        try {
+          const result = await api('/api/v1/stats');
+          if (!result.ok || !result.data) return;
+          const stats = result.data;
+          $('stats-requests').textContent = fmtInt(stats.total_requests);
+          $('stats-tokens').textContent = fmtInt(stats.total_tokens);
+          $('stats-cost').textContent = '$' + fmtCost(stats.total_cost_usd);
+          $('stats-emails').textContent = fmtInt(stats.emails_sent);
+          $('stats-discord').textContent = fmtInt(stats.discord_sent);
+          $('header-requests').textContent = fmtInt(stats.total_requests);
+        } catch (error) {
+          /* telemetry is non-critical */
+        }
+      }
+
+      async function checkUpdates() {
+        const button = $('check-updates');
+        const label = $('updates-status');
+        button.disabled = true;
+        label.className = 'badge badge-iris';
+        label.textContent = 'checking pypi…';
+        try {
+          const result = await api('/api/v1/system/check-updates');
+          const list = $('updates-list');
+          list.innerHTML = '';
+          if (!result.ok) {
+            label.className = 'badge badge-red';
+            label.textContent = 'check failed';
+            return;
+          }
+          const updates = Array.isArray(result.data) ? result.data : [];
+          const pending = updates.filter((item) => item.update_available).length;
+          label.className = 'badge ' + (pending ? 'badge-amber' : 'badge-env');
+          label.textContent = pending ? pending + ' update' + (pending === 1 ? '' : 's') : 'all current';
+          if (!updates.length) {
+            const empty = document.createElement('p');
+            empty.className = 'text-[.7rem] text-zinc-600';
+            empty.textContent = 'PyPI responded but returned no package rows.';
+            list.appendChild(empty);
+            return;
+          }
+          updates.forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-3 py-2';
+            const left = document.createElement('div');
+            left.className = 'flex flex-wrap items-center gap-2';
+            const name = document.createElement('span');
+            name.className = 'mono text-[.7rem] text-zinc-300';
+            name.textContent = item.package_name;
+            const versions = document.createElement('span');
+            versions.className = 'mono text-[.62rem] text-zinc-600';
+            versions.textContent = (item.installed_version || 'not installed') + ' → ' + (item.latest_stable_version || '?');
+            left.append(name, versions);
+            const badge = document.createElement('span');
+            badge.className = 'badge ' + (item.update_available ? 'badge-amber' : 'badge-env');
+            badge.textContent = item.update_available ? 'update available' : 'up to date';
+            row.append(left, badge);
+            list.appendChild(row);
+          });
+        } catch (error) {
+          label.className = 'badge badge-red';
+          label.textContent = 'check failed';
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      /* ---------------- wiring ---------------- */
+
+      function wireEvents() {
+        document.querySelectorAll('.eye').forEach((button) => {
+          button.addEventListener('click', () => {
+            const input = $(button.dataset.toggle);
+            if (!input) return;
+            input.type = input.type === 'password' ? 'text' : 'password';
+          });
+        });
+
+        $('provider-select').addEventListener('change', () => {
+          // Keys are stored per provider, so an NVIDIA key can never be sent to
+          // OpenRouter after switching back and forth.
+          storeCurrentProviderKey();
+          loadProviderKey($('provider-select').value);
+          state.models = [];
+          state.search = '';
+          $('model-search').value = '';
+          setFilter('all');
+          $('model-select').innerHTML = '';
+          const placeholder = document.createElement('option');
+          placeholder.value = $('provider-select').value === 'openrouter' ? 'openrouter/auto' : '';
+          placeholder.textContent = $('provider-select').value === 'openrouter' ? 'openrouter/auto — Auto Router (default)' : 'Discover models to choose';
+          $('model-select').appendChild(placeholder);
+          $('model-counter').className = 'badge badge-empty badge-counter';
+          $('model-counter').textContent = '0 models';
+          $('model-hint').textContent = 'Click Discover Live Models to load this provider’s current model list.';
+          syncProviderUi();
+          syncModelBadges();
+          persist();
+        });
+
+        $('discover-models').addEventListener('click', () => discoverModels());
+
+        $('theme-toggle').addEventListener('click', () => {
+          const isLight = document.documentElement.classList.contains('light');
+          setTheme(isLight ? 'dark' : 'light');
+        });
+
+        $('use-env-key').addEventListener('click', () => {
+          const provider = $('provider-select').value;
+          delete state.providerKeys[provider];
+          $('llm-api-key').value = '';
+          persist();
+          renderKeySource();
+          toast('Using the server .env key for ' + provider, 'ok');
+        });
+
+        $('output-language').addEventListener('change', (event) => {
+          writeStorage(LS.outputLang, event.target.value);
+        });
+
+        $('model-search').addEventListener('input', (event) => {
+          state.search = event.target.value;
+          applyFilter();
+        });
+
+        $('filter-chips').addEventListener('click', (event) => {
+          const chip = event.target.closest('.chip');
+          if (!chip) return;
+          setFilter(chip.dataset.filter);
+          applyFilter();
+        });
+
+        $('model-select').addEventListener('change', () => {
+          syncModelBadges();
+          persist();
+        });
+
+        $('digest-form').addEventListener('submit', runDigest);
+        $('copy-markdown').addEventListener('click', copyMarkdown);
+        $('download-markdown').addEventListener('click', downloadMarkdown);
+        $('dismiss-error').addEventListener('click', hideError);
+        $('check-updates').addEventListener('click', checkUpdates);
+
+        $('llm-api-key').addEventListener('input', () => {
+          storeCurrentProviderKey();
+          renderKeySource();
+        });
+
+        $('save-keys').addEventListener('click', () => {
+          persist();
+          renderKeySource();
+          toast('Keys saved to this browser', 'ok');
+        });
+        $('clear-keys').addEventListener('click', clearVault);
+
+        document.querySelectorAll('.example-topic').forEach((chip) => {
+          chip.addEventListener('click', () => {
+            $('topic-input').value = chip.textContent.trim();
+            $('topic-input').focus();
+          });
+        });
+
+        $('topic-input').addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            runDigest();
+          }
+        });
+
+        $('notify-email').addEventListener('change', (event) => {
+          if (event.target.checked && !$('recipient-email').value.trim()) {
+            $('recipient-email').focus();
+            toast('Add a recipient email for email delivery', 'info');
+          }
+        });
+
+        $('notify-discord').addEventListener('change', (event) => {
+          if (event.target.checked && !$('discord-webhook-url').value.trim() && !state.env.discord_configured) {
+            toast('Add a Discord webhook URL to actually deliver the alert', 'info');
+          }
+        });
+
+        let autosaveTimer = null;
+        SECRET_FIELDS.concat(['resend-from-email', 'custom-base-url']).forEach((id) => {
+          $(id).addEventListener('input', () => {
+            clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(persist, 500);
+          });
+        });
+      }
+
+      async function init() {
+        restore();
+        wireEvents();
+        applyFilter();
+        await loadProviders();
+        loadStats();
+        const provider = $('provider-select').value;
+        if ($('llm-api-key').value.trim() || state.env.providers_configured?.[provider]) {
+          discoverModels({ silent: true });
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
